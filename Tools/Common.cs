@@ -14,14 +14,14 @@ namespace Tools
             var nonPrimes = new HashSet<long>(); 
 
             for(long x = start; x < end; ++x )
-            //foreach (var x in Enumerable.Range(start, (int)Math.Sqrt(end) - start))
+            //foreach (var x in Enumerable.Range((int)start, (int)Math.Sqrt(end) - (int)start))
             {
                 if (nonPrimes.Contains(x))
                     continue;
 
                 var x2 = x * x;
 
-                for (long multiplier = 1; x2 + (multiplier * x) <= end; ++multiplier)
+                for (long multiplier = 0; x2 + (multiplier * x) <= end; ++multiplier)
                     nonPrimes.Add(x2 + (multiplier * x));
             }
 

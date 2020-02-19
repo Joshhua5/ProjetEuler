@@ -41,7 +41,7 @@ namespace Question51
         }
 
         /// <summary>
-        /// Generates  
+        /// Generate a list of values using the prime as a base and set of replacement indices to replace.
         /// </summary>
         /// <returns></returns>
         static IEnumerable<int> GetModifiedValues(ReadOnlySpan<char> prime, int[] replacementIndex)
@@ -72,8 +72,6 @@ namespace Question51
         {
             var primes = Common.GetPrimesSieve(2, 10_000_000).ToArray();
             var primeLookup = primes.ToHashSet();
-
-            var s = GetReplacementIndices(5, 2);
 
             var iterations = new[] { 2, 3, 4, 5};
 
