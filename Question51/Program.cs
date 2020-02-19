@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
+using System.Threading;
 using System.Threading.Tasks;
 using Tools;
 
@@ -11,100 +13,95 @@ namespace Question51
     class Program
     {
 
-        static Dictionary<string, List<int[]>> IndexCombinationCache = new Dictionary<string, List<int[]>>();
+        static readonly Dictionary<string, int[][]> IndexCombinationCache = new Dictionary<string, int[][]>();
 
-        static IEnumerable<int[]> GetReplacementIndices(string value, int iterations)
+        static int[][] GetReplacementIndices(int valueLength, int iterations)
         {
-            if(!IndexCombinationCache.TryGetValue($"{iterations}:{value.Length}", out var indices))
+            if (!IndexCombinationCache.TryGetValue($"{iterations}:{valueLength}", out var indices))
             {
-                int charConvert = 48; 
                 indices =
-                    Enumerable.Range(0, (int) Math.Pow(10, iterations + 1))  
-                        .Select(x => x.ToString().Select(y => ((int)y) - charConvert).ToArray())
-                        .Where(x => x.Length == iterations)
-                        .Where(x => x.All(y => y < value.Length))
+                    Enumerable.Range(0, (int)Math.Pow(10, iterations + 1))  // Get a set of values which will contain a subset of all possible indices
+                        .Select(x => x.ToString().Select(y => (int)y - '0').ToArray()) // Convert each character into a index 0-9 
+                        .Where(x => x.Length == iterations) // Limit the index count to how many iterations we're using
+                        .Where(x => x.All(y => y < valueLength)) // Remove all combinations that contain a index too large for our value.
                         .Where(x => x.Distinct().Count() == iterations)
-                        .ToList();
-                 
-                IndexCombinationCache.Add($"{iterations}:{value.Length}", indices);
+                        .Select(x => new
+                        {
+                            identifier = x.OrderBy(y => y).Select(y => y.ToString()).Aggregate((a, b) => $"{a}{b}"),
+                            sequence = x
+                        }) // Construct a ordered string, that we can use to remove duplicates
+                        .GroupBy(x => x.identifier) // Remove duplicates using the new identifier
+                        .Select(x => x.First().sequence)
+                        .ToArray();
+
+                IndexCombinationCache.Add($"{iterations}:{valueLength}", indices);
             }
-
-
+             
             return indices;
+        }
+
+        /// <summary>
+        /// Generates  
+        /// </summary>
+        /// <returns></returns>
+        static IEnumerable<int> GetModifiedValues(ReadOnlySpan<char> prime, int[] replacementIndex)
+        {
+            var constructedPrimes = new int[10];
+
+            for (var i = 0; i <= 9; ++i)
+            {
+                for (var pos = 0; pos < prime.Length; ++pos)
+                {
+                    //Shift the last digit we worked on up a position
+                    constructedPrimes[i] *= 10;
+
+                    var replaced = false;
+
+                    for (var j = 0; j < replacementIndex.Length; ++j)
+                        replaced |= replacementIndex[j] == pos;
+
+                    constructedPrimes[i] += replaced ? i : (prime[pos] - '0');
+                }
+            }
+ 
+            return constructedPrimes;
         }
 
 
         static void Main(string[] args)
         {
-            var primes = Common.GetPrimesSieve(1_000, 1_000_000).Select(x => x.ToString()).ToArray();
-            var groupedPrimes = primes.GroupBy(x => x.Length).ToArray();
+            var primes = Common.GetPrimesSieve(2, 10_000_000).ToArray();
             var primeLookup = primes.ToHashSet();
-            
-            var families = new Dictionary<string, string[]>();
 
-            foreach (var prime in primes)
+            var s = GetReplacementIndices(5, 2);
+
+            var iterations = new[] { 2, 3, 4, 5};
+
+            foreach (var iteration in iterations)
             {
-                var pString = prime.ToString();
-                var pArray = pString.ToCharArray();
-                foreach (var iteration in Enumerable.Range(2, pString.Length - 2)) 
+                foreach (var prime in primes.Select(x => x.ToString()).Where(x => x.Length > iteration))
                 {
-                    var indexSets = GetReplacementIndices(pString, iteration); 
-                    foreach (var set in indexSets)
+                    var primeSpan = prime.AsSpan();
+
+                    var indices = GetReplacementIndices(primeSpan.Length, iteration);
+                    foreach (var index in indices)
                     {
-                        var cArray = pString.ToCharArray();
-                        foreach (var n in Enumerable.Range(0, 10).Select(x => (char) (x + '0')))
-                        { 
-                            var family = groupedPrimes
-                                .FirstOrDefault(x => x.Key == pString.Length)
-                                .Select(targets =>
-                                {
-                                    foreach (var i in set)
-                                        cArray[i] = n;
+                        var family = GetModifiedValues(primeSpan, index)
+                            .Where(x => primeLookup.Contains(x));
+                          
+                        if (family.Count() == 8)
+                        {
+                            var familyString = family.Select(x => x.ToString()).ToArray();
+                            // Validate that no numbers have had 0 placed in front
+                            if (familyString.Any(x => x.Length != prime.Length) | !familyString.Contains(prime))
+                                continue;
 
-                                    return new string(cArray);
-                                })
-                                .Where(x => primeLookup.Contains(x)) 
-                                .ToArray();
-
-
-                            // var family = GetReplacementIndices(pString, n, iterations) 
-                            //     .Where(x => primeLookup.Contains(x))
-                            //     .Distinct()
-                            //     .ToArray();
-
-                            if (family.Length >= 8)
-                            {
-                                if(family.Distinct().Count() != 8)
-                                    continue;
-                                
-                                lock (families)
-                                {
-                                    families.Add($"{prime}:{n}:{iteration}", family);
-                                }
-
-                                Console.WriteLine(
-                                    $"Prime: {pString}, Replacement: {n}, Family: {family.Aggregate((a, b) => $"{a} {b}")}");
-                            }
+                            Console.WriteLine($"{prime} : {iteration} | Family {familyString.Aggregate((a, b) => $"{a}, {b}")}");
+                            return;
                         }
                     }
                 }
-            }
-
-
-            var min8Family = families
-                .OrderBy(x => x.Key)
-                .FirstOrDefault(x => x.Value.Length == 8);
-
-            var minPrime = families
-                .SelectMany(x => x.Value)
-                .OrderBy(x => x)
-                .FirstOrDefault();
-
-            Console.WriteLine(min8Family.Key);
-
-            Console.WriteLine(min8Family.Key);
-
-            Console.WriteLine();
+            } 
         } 
-    } 
+    }
 }

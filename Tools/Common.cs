@@ -6,18 +6,22 @@ namespace Tools
 {
     public static class Common
     {
-        public static IEnumerable<long> GetPrimesSieve(int start, long end)
+        public static IEnumerable<long> GetPrimesSieve(long start, long end)
         {
-            var nonPrimes = new HashSet<int>();
+            if (start < 2)
+                start = 2;
 
-            foreach (var x in Enumerable.Range(start, (int)Math.Sqrt(end) - start))
+            var nonPrimes = new HashSet<long>(); 
+
+            for(long x = start; x < end; ++x )
+            //foreach (var x in Enumerable.Range(start, (int)Math.Sqrt(end) - start))
             {
                 if (nonPrimes.Contains(x))
                     continue;
 
                 var x2 = x * x;
 
-                for (var multiplier = 1; x2 + (multiplier * x) <= end; ++multiplier)
+                for (long multiplier = 1; x2 + (multiplier * x) <= end; ++multiplier)
                     nonPrimes.Add(x2 + (multiplier * x));
             }
 
